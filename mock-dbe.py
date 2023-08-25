@@ -20,14 +20,20 @@ import baseband.vdif as vdif
 
 def main(argv: Sequence[str] | None = None) -> int:
     # Process commandline arguments
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="""Pretends to be a VLBI digital back end (DBE) by extracting VDIF data frames
+             from a file and sending them as UDP datagrams to a host.""",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument('-v', '--verbose', required=False, action='store_true',
         help='Print some extra info during runtime')
     parser.add_argument('-i', '--ip', '--host', required=False,
         default='localhost',
-        help='The host or IP to which to send UDP datagrams')
+        help='The host or IP to which to send UDP datagrams',
+    )
     parser.add_argument('-p', '--port', required=False, default=7890,
-        help='The port on which to send UDP datagrams')
+        help='The port on which to send UDP datagrams',
+    )
     parser.add_argument('vdif_file', help='The VDIF file to stream')
     args = parser.parse_args(argv)
 

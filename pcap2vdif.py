@@ -20,7 +20,12 @@ from pcapkit import extract, UDP
 
 def main(argv: Sequence[str] | None = None) -> int:
     # Process commandline arguments
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="""Extracts UDP datagram payloads from a PCAP capture file.""",
+        epilog=f"""This script is called {PurePath(__file__).stem} because it's assumed this will
+            be used on PCAP captures that contain VDIF data frames inside UDP datagrams.""",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument('pcapfile',
         help='The PCAP file from which to extract VDIF data frames')
     args = parser.parse_args(argv)
