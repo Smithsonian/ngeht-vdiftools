@@ -1,4 +1,4 @@
-**[STRUCTURE][] | [GETTING STARTED][] | [RUNNING][] | [TESTING][]**
+**[STRUCTURE][] | [GETTING STARTED][] | [RUNNING][] | [TESTING][] | [CHANGE CONTROL][]| [CONTRIBUTING][] | [LICENSING][]**
 
 # vdif-tools
 [r]: #repo
@@ -107,3 +107,24 @@ by running with the `-h` option.
     1. This should generate 8 `.vdif` files. You can individually compare them to
     `examples/sample.vdif`, or you can concatenate the 8 files together into a single file and
     compare that to `examples/sample.vdif`. Either way, each VDIF data frame should be identical.
+
+# Change control
+[change control]: #change-control "Change control"
+
+The branches shown in the table below are associated with development milestones or otherwise have a policy requiring the branch content remain stable and therefore be kept under a level of change control. GitHub's branch protection rules are used to enforce change control for these branches.
+
+| Branch | Description |
+|:---:|---|
+| main | The default branch; expected to always contain stable, feature-complete versions of the software |
+
+See the [Branch protection rules](https://github.com/Smithsonian/ngeht-vdiftools/settings/branches) for details on the protection configuration for all branches. The typical configuration will require pull requests to be used to merge changes into a protected branch; no direct commits will be permitted. This allows an independent member of the team to review the changes and explain what requires attention. This workflow encourages a more regular code review process than might otherwise happen. The set of approvers is specified in the pull request.
+
+# Contributing
+[contributing]: #contributing "Contributing"
+
+See [CONTRIBUTING.md]() for details on the developer workflow for contributing changes to the software.
+
+# Licensing
+[licensing]: #licensing "Licensing"
+
+See the [LICENSE]() file for details on the licensing of this software.
