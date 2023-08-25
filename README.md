@@ -3,9 +3,10 @@
 # vdif-tools
 [r]: #repo
 
-This repository contains VDIF-related tools. Initially, they were developed to facilitate
-testing of the ngDBE (Digital Back End) by providing a way to extract VDIF data frames from
-PCAP captures.
+This repository is hosted at https://github.com/Smithsonian/ngeht-vdiftools
+
+It contains VDIF-related tools initially developed to facilitate testing of the ngDBE (Digital
+Back End) by providing a way to extract VDIF data frames from PCAP captures.
 
 # Repository structure
 [structure]: #repository-structure "Repository structure"
