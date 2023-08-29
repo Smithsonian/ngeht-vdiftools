@@ -29,11 +29,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         help='Print some extra info during runtime')
     parser.add_argument('-i', '--ip', '--host', required=False,
         default='localhost',
-        help='The host or IP to which to send UDP datagrams',
-    )
+        help='The host or IP to which to send UDP datagrams')
     parser.add_argument('-p', '--port', required=False, default=7890,
-        help='The port on which to send UDP datagrams',
-    )
+        help='The port on which to send UDP datagrams')
     parser.add_argument('vdif_file', help='The VDIF file to stream')
     args = parser.parse_args(argv)
 
