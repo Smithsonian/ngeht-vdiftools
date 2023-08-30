@@ -37,6 +37,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     extraction = extract(fin=args.pcapfile, nofile=True, store=True,
                          reassembly=True, reasm_strict=True, ipv4=True)
 
+    # TODO There's some common functionality below that could be refactored.
+
     # Inspect the reassembled IPv4 packets if we got them
     if len(extraction.reassembly.ipv4) > 0:
         for dgram_no, dgram in enumerate(extraction.reassembly.ipv4):
@@ -56,6 +58,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 outfile = f'{vdif_outfile_stem}_{frame_no}.vdif'
                 with open(outfile, 'wb') as of:
                     of.write(vdif_frame)
+            elif frame.protocol == 'Ethernet':
+                # This is an Ethernet frame that pcapkit could decode and no reassembly was
+                # required. We can look for UDP directly.
+                if UDP in frame:
+                    # TODO Should we check anything else?
+                    vdif_frame = frame[UDP].payload.data
+                    outfile = f'{vdif_outfile_stem}_{frame_no}.vdif'
+                    with open(outfile, 'wb') as of:
+                        of.write(vdif_frame)
+            else:
+                pass
 
     return 0
 
