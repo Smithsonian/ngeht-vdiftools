@@ -40,13 +40,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     vdif_outfile_stem = PurePath(args.pcapfile).stem
 
     # Extract selected packets and attempt IPv4 reassembly
-    all_packets = (args.start_packet == 0) and (args.num_packets == 0)
+    start_packet = int(args.start_packet)
+    num_packets = int(args.num_packets)
+    all_packets = (start_packet == 0) and (num_packets == 0)
     extraction = extract(fin=args.pcapfile, nofile=True, store=True,
                         reassembly=not args.r, reasm_strict=True, ipv4=True, auto=all_packets)
 
     if not all_packets:
         # Read all packets up to the end. Necessary due to the PCAP format.
-        end_packet = 0 if args.num_packets == 0 else args.start_packet + args.num_packets
+        end_packet = 0 if num_packets == 0 else start_packet + num_packets
         for frame_no, e in enumerate(extraction):
             if frame_no == end_packet:
                 break
@@ -59,7 +61,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         # pcapkit didn't reassemble IPv4 from the capture, so ... ¯\_(ツ)_/¯
         for frame_no, frame in enumerate(extraction.frame):
-            if frame_no in range(args.start_packet, end_packet):
+            if frame_no in range(start_packet, end_packet):
                 if frame.protocol == 'NULL':
                     # The frame is from a loopback interface and so we assume it's a full UDP
                     # datagram. We assume a 4-byte link layer header, 20-byte IP header, and 8-byte
