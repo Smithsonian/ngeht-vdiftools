@@ -26,7 +26,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             be used on PCAP captures that contain VDIF data frames inside UDP datagrams.""",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument('--pcapfile', required=False,
+    parser.add_argument('pcapfile',
         help='The PCAP file from which to extract VDIF data frames')
     parser.add_argument('-r', required=False, default=False, action='store_true',
         help='Disable IPv4 reassembly')
