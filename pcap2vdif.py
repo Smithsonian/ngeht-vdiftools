@@ -34,6 +34,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help='PCAP packet number (0-based) from which to start extraction')
     parser.add_argument('--num-packets', required=False, default=0,
         help='Number of PCAP packets to extract (0=all packets from start packet)')
+    parser.add_argument('--single-vdif', required=False, default=False, action='store_true',
+        help='Stores all VDIF frames in a single VDIF file instead of individual files')
     args = parser.parse_args(argv)
 
     # Setup stuff for naming the output files
@@ -43,44 +45,63 @@ def main(argv: Sequence[str] | None = None) -> int:
     start_packet = int(args.start_packet)
     num_packets = int(args.num_packets)
     all_packets = (start_packet == 0) and (num_packets == 0)
+    end_packet = 0 if num_packets == 0 else start_packet + num_packets
     extraction = extract(fin=args.pcapfile, nofile=True, store=True,
                         reassembly=not args.r, reasm_strict=True, ipv4=True, auto=all_packets)
 
     if not all_packets:
         # Read all packets up to the end. Necessary due to the PCAP format.
-        end_packet = 0 if num_packets == 0 else start_packet + num_packets
         for frame_no, e in enumerate(extraction):
             if frame_no == end_packet:
                 break
+
+    # For single-vdif mode
+    collected_frames = bytearray()
 
     # Inspect the reassembled IPv4 packets if we got them
     if (not args.r) and (len(extraction.reassembly.ipv4) > 0):
         for dgram_no, dgram in enumerate(extraction.reassembly.ipv4):
             if UDP in dgram.packet:
-                write_vdif_file(dgram.packet.payload.data, vdif_outfile_stem, frame_no)
+                if args.single_vdif:
+                    collected_frames += dgram.packet.payload.data
+                else:
+                    write_vdif_file(dgram.packet.payload.data, vdif_outfile_stem, frame_no)
     else:
         # pcapkit didn't reassemble IPv4 from the capture, so ... ¯\_(ツ)_/¯
         for frame_no, frame in enumerate(extraction.frame):
-            if frame_no in range(start_packet, end_packet):
+            if all_packets or (frame_no in range(start_packet, end_packet)):
                 if frame.protocol == 'NULL':
                     # The frame is from a loopback interface and so we assume it's a full UDP
                     # datagram. We assume a 4-byte link layer header, 20-byte IP header, and 8-byte
                     # UDP header.
-                    write_vdif_file(frame.payload.data[4+20+8:], vdif_outfile_stem, frame_no)
+                    if args.single_vdif:
+                        collected_frames += frame.payload.data[4+20+8:]
+                    else:
+                        write_vdif_file(frame.payload.data[4+20+8:], vdif_outfile_stem, frame_no)
                 elif (frame.protocol == 'Ethernet') and (UDP in frame):
                     # This is an Ethernet frame that pcapkit could decode and no reassembly was
                     # required. We can look for UDP directly.
-                    write_vdif_file(frame[UDP].payload.data, vdif_outfile_stem, frame_no)
+                    if args.single_vdif:
+                        collected_frames += frame[UDP].payload.data
+                    else:
+                        write_vdif_file(frame[UDP].payload.data, vdif_outfile_stem, frame_no)
                 else:
                     pass
+
+    if args.single_vdif and (len(collected_frames) > 0):
+        write_vdif_file(collected_frames, vdif_outfile_stem)
 
     return 0
 
 
-def write_vdif_file(vdif_frame, file_stem, frame_no):
-    outfile = f'{file_stem}_{frame_no}.vdif'
+def write_vdif_file(vdif_frames, file_stem, frame_no=None):
+    outfile = f'{file_stem}'
+    if None is not frame_no:
+        outfile += f'_{frame_no}'
+    outfile += '.vdif'
+
     with open(outfile, 'wb') as of:
-        of.write(vdif_frame)
+        of.write(vdif_frames)
 
 
 if __name__ == "__main__":
