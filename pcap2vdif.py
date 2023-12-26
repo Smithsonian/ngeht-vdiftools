@@ -80,5 +80,6 @@ def write_vdif_file(vdif_frame, file_stem, frame_no):
     with open(outfile, 'wb') as of:
         of.write(vdif_frame)
 
+
 if __name__ == "__main__":
     raise SystemExit(main())
