@@ -49,92 +49,31 @@ local vdif_edv3_header = {
 p_vdif.fields.header = ProtoField.bytes("vdif.header", "Header", base.NONE)
 p_vdif.fields.data = ProtoField.bytes("vdif.data", "Data", base.NONE)
 
+-- helper function for adding VDIF header ProtoFields
+local function add_header_fields(header_spec, path, word_offset)
+    for iword, flist in ipairs(header_spec) do
+        local wstart = (iword-1) + word_offset
+        local wname = path .. (wstart)
+        p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
+
+        local fstart = 0
+        for ifield, fpar in ipairs(header_spec[iword]) do
+            local fname, flen = unpack(fpar)
+            -- bitmask is used to obtain the fields within each header word
+            p_vdif.fields[wname..fname] =
+                ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
+                                fname, base.DEC, nil, (2^flen-1)*2^fstart)
+            fstart = fstart + flen
+        end
+    end
+end
+
 -- the ProtoFields must be allocated here outside of the dissector function
--- base header first
-for iword, flist in ipairs(vdif_header) do
-    local wstart = 4*(iword-1)
-    local wname = "word" .. (iword-1)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
-
-    local fstart = 0
-    for ifield, fpar in ipairs(vdif_header[iword]) do
-        local fname, flen = unpack(fpar)
-        -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[wname..fname] =
-            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
-                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
-        fstart = fstart + flen
-    end
-end
-
--- edv0 header
-for iword, flist in ipairs(vdif_edv0_header) do
-    local wstart = (iword-1)+4
-    local wname = "edv0.word" .. (wstart)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
-
-    local fstart = 0
-    for ifield, fpar in ipairs(vdif_edv0_header[iword]) do
-        local fname, flen = unpack(fpar)
-        -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[wname..fname] =
-            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
-                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
-        fstart = fstart + flen
-    end
-end
-
--- edv2 alma header
-for iword, flist in ipairs(vdif_edv2_header_alma) do
-    local wstart = (iword-1)+4
-    local wname = "edv2.alma.word" .. (wstart)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
-
-    local fstart = 0
-    for ifield, fpar in ipairs(vdif_edv2_header_alma[iword]) do
-        local fname, flen = unpack(fpar)
-        -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[wname..fname] =
-            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
-                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
-        fstart = fstart + flen
-    end
-end
-
--- edv2 r2dbe header
-for iword, flist in ipairs(vdif_edv2_header_r2dbe) do
-    local wstart = (iword-1)+4
-    local wname = "edv2.r2dbe.word" .. (wstart)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
-
-    local fstart = 0
-    for ifield, fpar in ipairs(vdif_edv2_header_r2dbe[iword]) do
-        local fname, flen = unpack(fpar)
-        -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[wname..fname] =
-            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
-                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
-        fstart = fstart + flen
-    end
-end
-
--- edv3 header
-for iword, flist in ipairs(vdif_edv3_header) do
-    local wstart = (iword-1)+4
-    local wname = "edv3.word" .. (wstart)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
-
-    local fstart = 0
-    for ifield, fpar in ipairs(vdif_edv3_header[iword]) do
-        local fname, flen = unpack(fpar)
-        -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[wname..fname] =
-            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
-                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
-        fstart = fstart + flen
-    end
-end
-
+add_header_fields(vdif_header, "word", 0)
+add_header_fields(vdif_edv0_header, "edv0.word", 4)
+add_header_fields(vdif_edv2_header_alma, "edv2.alma.word", 4)
+add_header_fields(vdif_edv2_header_r2dbe, "edv2.r2dbe.word", 4)
+add_header_fields(vdif_edv3_header, "edv3.word", 4)
 
 function p_vdif.dissector(buffer, pinfo, tree)
     pinfo.cols.protocol = p_vdif.name
