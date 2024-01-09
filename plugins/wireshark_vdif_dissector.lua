@@ -37,6 +37,7 @@ local vdif_edv2_header_r2dbe = {
     {{'psn_lower', 32}}   -- Lower 32 bits of the 64-bit psn
 }
 
+p_vdif.fields.header = ProtoField.bytes("vdif.header", "Header", base.NONE)
 p_vdif.fields.data = ProtoField.bytes("vdif.data", "Data", base.NONE)
 
 -- the ProtoFields must be allocated here outside of the dissector function
@@ -44,13 +45,15 @@ p_vdif.fields.data = ProtoField.bytes("vdif.data", "Data", base.NONE)
 for iword, flist in ipairs(vdif_header) do
     local wstart = 4*(iword-1)
     local wname = "word" .. (iword-1)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif." .. wname, wname, base.NONE)
+    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
 
     local fstart = 0
     for ifield, fpar in ipairs(vdif_header[iword]) do
         local fname, flen = unpack(fpar)
         -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[fname] = ProtoField.uint32("vdif." .. fname, fname, base.DEC, nil, (2^flen-1)*2^fstart)
+        p_vdif.fields[wname..fname] =
+            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
+                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
         fstart = fstart + flen
     end
 end
@@ -58,14 +61,16 @@ end
 -- edv2 alma header
 for iword, flist in ipairs(vdif_edv2_header_alma) do
     local wstart = (iword-1)+4
-    local wname = "edv2_alma_word" .. (wstart)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif." .. wname, wname, base.NONE)
+    local wname = "edv2.alma.word" .. (wstart)
+    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
 
     local fstart = 0
     for ifield, fpar in ipairs(vdif_edv2_header_alma[iword]) do
         local fname, flen = unpack(fpar)
         -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[fname] = ProtoField.uint32("vdif." .. fname, fname, base.DEC, nil, (2^flen-1)*2^fstart)
+        p_vdif.fields[wname..fname] =
+            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
+                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
         fstart = fstart + flen
     end
 end
@@ -73,40 +78,51 @@ end
 -- edv2 r2dbe header
 for iword, flist in ipairs(vdif_edv2_header_r2dbe) do
     local wstart = (iword-1)+4
-    local wname = "edv2_r2dbe_word" .. (wstart)
-    p_vdif.fields[wname] = ProtoField.bytes("vdif." .. wname, wname, base.NONE)
+    local wname = "edv2.r2dbe.word" .. (wstart)
+    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
 
     local fstart = 0
     for ifield, fpar in ipairs(vdif_edv2_header_r2dbe[iword]) do
         local fname, flen = unpack(fpar)
         -- bitmask is used to obtain the fields within each header word
-        p_vdif.fields[fname] = ProtoField.uint32("vdif." .. fname, fname, base.DEC, nil, (2^flen-1)*2^fstart)
+        p_vdif.fields[wname..fname] =
+            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
+                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
         fstart = fstart + flen
     end
 end
 
 function p_vdif.dissector(buffer, pinfo, tree)
     pinfo.cols.protocol = p_vdif.name
-    local vtree = tree:add(p_vdif, buffer(), p_vdif.name .. " Protocol Data")
+    local vtree = tree:add(p_vdif, buffer(), p_vdif.name .. " Protocol")
+
+    -- determine header length and add appropriately-sized subtree
+    local legacymode = 0 ~= bit32.band(buffer(0,1):le_uint(), 0x40)
+    if legacymode then
+        hdr_length = 16
+    else
+        hdr_length = 32
+    end
+    local hdr_tree = vtree:add(p_vdif.fields.header, buffer:range(0,hdr_length))
+    hdr_tree:set_text("Header (" .. hdr_length .. " bytes)")
 
     -- do first four words of base header first
     for iword, flist in ipairs(vdif_header) do
         if (iword < 5) then
             local wstart = 4*(iword-1)
             local wname = "word" .. (iword-1)
-            local wtree = vtree:add(p_vdif.fields[wname], buffer(wstart, 4))
+            local wtree = hdr_tree:add(p_vdif.fields[wname], buffer(wstart, 4))
 
             local fstart = 0
             for ifield, fpar in ipairs(vdif_header[iword]) do
                 fname, flen = unpack(fpar)
 
                 -- add_le each field as a subtree within the header word tree (little endian repr)
-                wtree:add_le(p_vdif.fields[fname], buffer(wstart, 4))
+                wtree:add_le(p_vdif.fields[wname..fname], buffer(wstart, 4))
             end
         end
     end
 
-    local legacymode = 0 ~= bit32.band(buffer(0,1):le_uint(), 0x40)
     if not legacymode then
         -- now figure how how to parse words4-7
         local htable = {}
@@ -116,10 +132,10 @@ function p_vdif.dissector(buffer, pinfo, tree)
         if buffer(19,1):le_uint() == 2 then
             if (bit32.band(buffer(16,3):le_uint(), 0xFFF0) == 0xA5EA50) then
                 htable = vdif_edv2_header_alma
-                wname_base = "edv2_alma_word"
+                wname_base = "edv2.alma.word"
             else
                 htable = vdif_edv2_header_r2dbe
-                wname_base = "edv2_r2dbe_word"
+                wname_base = "edv2.r2dbe.word"
             end
         else
             -- edv unsupported or zero; ensure we use the base vdif header
@@ -131,13 +147,13 @@ function p_vdif.dissector(buffer, pinfo, tree)
         for iword, flist in ipairs(htable) do
             local wstart = 4*(iword-1)+16
             local wname = wname_base .. (iword-1)+4
-            local wtree = vtree:add(p_vdif.fields[wname], buffer(wstart, 4))
+            local wtree = hdr_tree:add(p_vdif.fields[wname], buffer(wstart, 4))
 
             local fstart = 0
             for ifield, fpar in ipairs(htable[iword]) do
                 fname, flen = unpack(fpar)
                 -- add_le each field as a subtree within the header word tree (little endian repr)
-                wtree:add_le(p_vdif.fields[fname], buffer(wstart, 4))
+                wtree:add_le(p_vdif.fields[wname..fname], buffer(wstart, 4))
             end
         end
     end
