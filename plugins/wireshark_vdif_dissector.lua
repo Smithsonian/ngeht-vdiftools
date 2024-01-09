@@ -19,6 +19,8 @@ local vdif_header = {
     {{'frame', 24}, {'epoch', 6}, {'unassigned', 2}},
     {{'framelength8', 24}, {'nchan', 5}, {'version', 3}},
     {{'stationid', 16}, {'threadid', 10}, {'nbits', 5}, {'iscomplex', 1}},
+}
+local vdif_edv0_header = {
     {{'extended1', 24}, {'edv', 8}},
     {{'extended2', 32}},
     {{'extended3', 32}},
@@ -31,10 +33,17 @@ local vdif_edv2_header_alma = {
     {{'psn_lower', 32}}   -- Lower 32 bits of the 64-bit psn
 }
 local vdif_edv2_header_r2dbe = {
-    {{'polblock', 1}, {'bdcsideband', 1}, {'rxsideband', 1}, {'undefined', 1}, {'subversion', 20}, {'edv', 8}},
+    {{'polblock', 1}, {'bdcsideband', 1}, {'rxsideband', 1}, {'undefined', 21}, {'edv', 8}},
     {{'ppsdiff', 32}},
     {{'psn_upper', 32}},  -- Upper 32 bits of the 64-bit psn
     {{'psn_lower', 32}}   -- Lower 32 bits of the 64-bit psn
+}
+local vdif_edv3_header = {
+    {{'sampling_rate', 23}, {'sampling_unit', 1},{'edv', 8}},
+    {{'sync_pattern', 32}},
+    {{'loif_freq_tuning', 32}},
+    {{'personality_type', 8}, {'minor_rev', 4}, {'major_rev', 4}, {'esb', 1}, {'sub_band', 3},
+     {'if', 4}, {'dbe_unit', 4}, {'ua', 4}}
 }
 
 p_vdif.fields.header = ProtoField.bytes("vdif.header", "Header", base.NONE)
@@ -49,6 +58,23 @@ for iword, flist in ipairs(vdif_header) do
 
     local fstart = 0
     for ifield, fpar in ipairs(vdif_header[iword]) do
+        local fname, flen = unpack(fpar)
+        -- bitmask is used to obtain the fields within each header word
+        p_vdif.fields[wname..fname] =
+            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
+                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
+        fstart = fstart + flen
+    end
+end
+
+-- edv0 header
+for iword, flist in ipairs(vdif_edv0_header) do
+    local wstart = (iword-1)+4
+    local wname = "edv0.word" .. (wstart)
+    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
+
+    local fstart = 0
+    for ifield, fpar in ipairs(vdif_edv0_header[iword]) do
         local fname, flen = unpack(fpar)
         -- bitmask is used to obtain the fields within each header word
         p_vdif.fields[wname..fname] =
@@ -92,12 +118,30 @@ for iword, flist in ipairs(vdif_edv2_header_r2dbe) do
     end
 end
 
+-- edv3 header
+for iword, flist in ipairs(vdif_edv3_header) do
+    local wstart = (iword-1)+4
+    local wname = "edv3.word" .. (wstart)
+    p_vdif.fields[wname] = ProtoField.bytes("vdif.header." .. wname, wname, base.NONE)
+
+    local fstart = 0
+    for ifield, fpar in ipairs(vdif_edv3_header[iword]) do
+        local fname, flen = unpack(fpar)
+        -- bitmask is used to obtain the fields within each header word
+        p_vdif.fields[wname..fname] =
+            ProtoField.uint32("vdif.header." .. wname .. '.' .. fname,
+                              fname, base.DEC, nil, (2^flen-1)*2^fstart)
+        fstart = fstart + flen
+    end
+end
+
+
 function p_vdif.dissector(buffer, pinfo, tree)
     pinfo.cols.protocol = p_vdif.name
     local vtree = tree:add(p_vdif, buffer(), p_vdif.name .. " Protocol")
 
     -- determine header length and add appropriately-sized subtree
-    local legacymode = 0 ~= bit32.band(buffer(0,1):le_uint(), 0x40)
+    local legacymode = 0 ~= bit32.band(buffer(3,1):bytes():get_index(0), 0x40)
     if legacymode then
         hdr_length = 16
     else
@@ -128,19 +172,32 @@ function p_vdif.dissector(buffer, pinfo, tree)
         local htable = {}
         local wname_base = ""
 
-        print("blah")
-        if buffer(19,1):le_uint() == 2 then
-            if (bit32.band(buffer(16,3):le_uint(), 0xFFF0) == 0xA5EA50) then
-                htable = vdif_edv2_header_alma
-                wname_base = "edv2.alma.word"
-            else
-                htable = vdif_edv2_header_r2dbe
-                wname_base = "edv2.r2dbe.word"
-            end
+        local edv_table = {
+            [2] = function ()
+                if (bit32.band(buffer(16,3):le_uint(), 0xFFF0) == 0xA5EA50) then
+                    htable = vdif_edv2_header_alma
+                    wname_base = "edv2.alma.word"
+                else
+                    htable = vdif_edv2_header_r2dbe
+                    wname_base = "edv2.r2dbe.word"
+                end
+            end,
+            [3] = function ()
+                htable = vdif_edv3_header
+                wname_base = "edv3.word"
+            end,
+            ["default"] = function ()
+                -- edv unsupported or zero; ensure we use the base vdif header
+                htable = vdif_edv0_header
+                wname_base = "edv0.word"
+            end,
+        }
+
+        edv = buffer(19,1):bytes():get_index(0)
+        if edv_table[edv] then
+            edv_table[edv]()
         else
-            -- edv unsupported or zero; ensure we use the base vdif header
-            htable = vdif_header
-            wname_base = "word"
+            edv_table["default"]()
         end
 
         -- now do extended user data
