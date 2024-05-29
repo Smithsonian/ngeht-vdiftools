@@ -29,14 +29,14 @@ local vdif_edv0_header = {
 local vdif_edv2_header_alma = {
     {{'polblock', 1}, {'quadrantminus1', 2}, {'correlator', 1}, {'sync', 20}, {'edv', 8}},
     {{'status', 32}},
-    {{'psn_upper', 32}},  -- Upper 32 bits of the 64-bit psn
-    {{'psn_lower', 32}}   -- Lower 32 bits of the 64-bit psn
+    {{'psn_lower', 32}},  -- Lower 32 bits of the 64-bit psn
+    {{'psn_upper', 32}}   -- Upper 32 bits of the 64-bit psn
 }
 local vdif_edv2_header_r2dbe = {
     {{'polblock', 1}, {'bdcsideband', 1}, {'rxsideband', 1}, {'undefined', 21}, {'edv', 8}},
     {{'ppsdiff', 32}},
-    {{'psn_upper', 32}},  -- Upper 32 bits of the 64-bit psn
-    {{'psn_lower', 32}}   -- Lower 32 bits of the 64-bit psn
+    {{'psn_lower', 32}},  -- Lower 32 bits of the 64-bit psn
+    {{'psn_upper', 32}}   -- Upper 32 bits of the 64-bit psn
 }
 local vdif_edv3_header = {
     {{'sampling_rate', 23}, {'sampling_unit', 1},{'edv', 8}},
@@ -76,6 +76,10 @@ add_header_fields(vdif_edv2_header_r2dbe, "edv2.r2dbe.word", 4)
 add_header_fields(vdif_edv3_header, "edv3.word", 4)
 
 function p_vdif.dissector(buffer, pinfo, tree)
+    -- TODO validate whether this is a real VDIF packet
+    -- if not_valid_vdif
+    ---     return false
+
     pinfo.cols.protocol = p_vdif.name
     local vtree = tree:add(p_vdif, buffer(), p_vdif.name .. " Protocol")
 
@@ -155,7 +159,7 @@ function p_vdif.dissector(buffer, pinfo, tree)
     end
 
     -- remaininng data array payload
-    local hsize = 8*4
+    local hsize = hdr_length
     local dsize = buffer:len() - hsize
     vtree:add(p_vdif.fields.data, buffer(hsize, dsize)):set_text("Data Array (" .. dsize .. " bytes)")
 
