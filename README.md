@@ -123,9 +123,9 @@ See the [Branch protection rules](https://github.com/Smithsonian/ngeht-vdiftools
 # Contributing
 [contributing]: #contributing "Contributing"
 
-See [CONTRIBUTING.md]() for details on the developer workflow for contributing changes to the software.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details on the developer workflow for contributing changes to the software.
 
 # Licensing
 [licensing]: #licensing "Licensing"
 
-See the [LICENSE]() file for details on the licensing of this software.
+See the [LICENSE](LICENSE) file for details on the licensing of this software.
