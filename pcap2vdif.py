@@ -138,12 +138,12 @@ def process_packet(
         collected_frames[src][dst] = bytearray()
 
     # Append the VDIF frame for the src/dst pair.
-    collected_frames[src][dst] += vdif_frame[8 if has_vtp else 0:]
+    frame_data = vdif_frame[8 if has_vtp else 0:]
+    collected_frames[src][dst] += frame_data
 
     if file_per_frame:
         # Write out the file for this VDIF frame
-        write_vdif_file(
-            collected_frames[src][dst], f'{vdif_outfile_stem}_{src}_{dst}', packet_no)
+        write_vdif_file(frame_data, f'{vdif_outfile_stem}_{src}_{dst}', packet_no)
 
 
 def write_vdif_file(vdif_frames, file_stem, frame_no=None):
