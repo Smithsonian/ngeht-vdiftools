@@ -48,6 +48,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         help='Number of PCAP packets to extract (0=all packets from start packet)')
     parser.add_argument('--single-vdif', required=False, default=False, action='store_true',
         help='Stores all VDIF frames in a single VDIF file instead of individual files')
+    parser.add_argument('--vtpudp', required=False, default=False, action='store_true',
+        help='Enable if the PCAP capture contains VTP/UDP instead of raw VDIF')
     args = parser.parse_args(argv)
 
     # Setup stuff for naming the output files
@@ -74,8 +76,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 src = dgram.id.src
                 dst = dgram.id.dst
                 process_packet(
+                    args.vtpudp,
                     dgram.id.src, dgram.id.dst, dgram.packet.payload.data, vdif_outfile_stem,
-                    not args.single_vdif, dgram_no
+                    not args.single_vdif, dgram_no, has_vtp=args.vtpudp,
                 )
     else:
         # pcapkit didn't reassemble IPv4 from the capture, so ... ¯\_(ツ)_/¯
@@ -88,8 +91,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     src = ipaddress.ip_address(frame.payload.data[4+12:4+16])
                     dst = ipaddress.ip_address(frame.payload.data[4+16:4+20])
                     process_packet(
+                        args.vtpudp,
                         src, dst, frame.payload.data[4+20+8:], vdif_outfile_stem,
-                        not args.single_vdif, frame_no
+                        not args.single_vdif, frame_no,
                     )
                 elif (frame.protocol == 'Ethernet') and (UDP in frame):
                     # This is an Ethernet frame that pcapkit could decode and no reassembly was
@@ -97,8 +101,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     src = frame[IPv4].src
                     dst = frame[IPv4].dst
                     process_packet(
+                        args.vtpudp,
                         src, dst, frame[UDP].payload.data, vdif_outfile_stem, not args.single_vdif,
-                        frame_no
+                        frame_no,
                     )
                 else:
                     pass
@@ -116,12 +121,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def process_packet(
+    has_vtp,
     src: ipaddress.IPv4Address,
     dst: ipaddress.IPv4Address,
     vdif_frame: bytearray,
     vdif_outfile_stem: str,
     file_per_frame: bool = False,
-    packet_no=None
+    packet_no=None,
 ) -> None:
     """Utility function for common handling of packet data."""
     global collected_frames
@@ -132,12 +138,12 @@ def process_packet(
         collected_frames[src][dst] = bytearray()
 
     # Append the VDIF frame for the src/dst pair.
-    collected_frames[src][dst] += vdif_frame
+    frame_data = vdif_frame[8 if has_vtp else 0:]
+    collected_frames[src][dst] += frame_data
 
     if file_per_frame:
         # Write out the file for this VDIF frame
-        write_vdif_file(
-            collected_frames[src][dst], f'{vdif_outfile_stem}_{src}_{dst}', packet_no)
+        write_vdif_file(frame_data, f'{vdif_outfile_stem}_{src}_{dst}', packet_no)
 
 
 def write_vdif_file(vdif_frames, file_stem, frame_no=None):
