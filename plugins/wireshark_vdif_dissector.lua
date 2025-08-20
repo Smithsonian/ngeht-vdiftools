@@ -10,6 +10,17 @@ This is a custom VDIF frame dissector script for Wireshark. It is placed
 directly in the Wireshark user plugin folder.
 ]]
 
+unpack = unpack or table.unpack
+if not bit32 then
+    -- Fallback using Lua 5.3 native bitwise ops
+    bit32 = {
+        band = function(a, b) return a & b end,
+        bor  = function(a, b) return a | b end,
+        bxor = function(a, b) return a ~ b end,
+        lshift = function(a, b) return a << b end,
+        rshift = function(a, b) return a >> b end,
+    }
+end
 local p_vdif = Proto("VDIF", "VLBI Data Interchange Format")
 
 -- header fields by word: https://github.com/difx/difx/blob/main/libraries/vdifio/src/vdifio.h
